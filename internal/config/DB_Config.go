@@ -4,47 +4,63 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/joho/godotenv"
+	"golang.org/x/term"
 	"os"
+	"strings"
+	"syscall"
 )
+
+type DatabaseConfiguration struct {
+	User, Password, Host, Port, Name string
+}
 
 var (
-	errInput   error
-	dbUser     string
-	dbPassword string
-	dbHost     string
-	dbPort     string
-	dbName     string
+	errInput error // Убрать глобальную переменную !!!
 )
 
-func LoadDBConfig() {
+func (dc *DatabaseConfiguration) LoadDBConfig() {
 	err := godotenv.Load("../internal/config/env/.env")
 	if err != nil {
 		fmt.Println("Configuration (.env) file not found, switch to manual configuration ")
+		dc.manualConfigurationSetting()
 	} else {
-		dbUser = os.Getenv("DB_USER")
-		dbPassword = os.Getenv("DB_PASSWORD")
-		dbHost = os.Getenv("DB_HOST")
-		dbPort = os.Getenv("DB_PORT")
-		dbName = os.Getenv("DB_NAME")
+		dc.User = os.Getenv("DB_USER")
+		dc.Password = os.Getenv("DB_PASSWORD")
+		dc.Host = os.Getenv("DB_HOST")
+		dc.Port = os.Getenv("DB_PORT")
+		dc.Name = os.Getenv("DB_NAME")
 	}
 }
 
-func GetDatabaseURL() string {
+func (dc *DatabaseConfiguration) URL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
-		dbUser, dbPassword,
-		dbHost, dbPort, dbName)
+		dc.User, dc.Password,
+		dc.Host, dc.Port, dc.Name)
 }
 
-func manualConfigurationSetting() {
-	reader := bufio.NewReader(os.Stdin)
+func (dc *DatabaseConfiguration) manualConfigurationSetting() {
+	var dbPassBytes []byte
 	fmt.Print("Enter Database Username : ")
-	dbUser, errInput = reader.ReadString('\n')
-	if errInput != nil {
-
-	}
+	readFromCLI(&dc.User)
 	fmt.Print("Enter Database Password : ")
-	dbPassword, errInput = reader.ReadString('\n')
+	dbPassBytes, errInput = term.ReadPassword(int(syscall.Stdin))
 	if errInput != nil {
-
+		fmt.Printf("Error at enter password: %v\n", errInput)
 	}
+	dc.Password = string(dbPassBytes)
+	fmt.Print("\nEnter Database Host name : ")
+	readFromCLI(&dc.Host)
+	fmt.Print("Enter Database Port Number : ")
+	readFromCLI(&dc.Port)
+	fmt.Print("Enter Database Name : ")
+	readFromCLI(&dc.Name)
+}
+
+func readFromCLI(field *string) {
+	reader := bufio.NewReader(os.Stdin)
+	*field, errInput = reader.ReadString('\n')
+	if errInput != nil {
+		fmt.Printf("An error occurred when entering data :%v \n", errInput)
+	}
+	*field = strings.TrimSpace(*field)
 }
