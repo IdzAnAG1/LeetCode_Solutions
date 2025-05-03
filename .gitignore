@@ -1,2 +1,2 @@
 .idea
-internal/config/env/.env
+internal/config/env/.env.test
