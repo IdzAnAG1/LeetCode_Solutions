@@ -1,11 +1,13 @@
 package config
 
 import (
+	"LeetCode_Solutions/internal/config/ui"
 	"bufio"
 	"fmt"
 	"github.com/joho/godotenv"
 	"golang.org/x/term"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -13,10 +15,6 @@ import (
 type DatabaseConfiguration struct {
 	User, Password, Host, Port, Name string
 }
-
-var (
-	errInput error // Убрать глобальную переменную !!!
-)
 
 func (dc *DatabaseConfiguration) LoadDBConfig() {
 	err := godotenv.Load("../internal/config/env/.env")
@@ -39,28 +37,76 @@ func (dc *DatabaseConfiguration) URL() string {
 }
 
 func (dc *DatabaseConfiguration) manualConfigurationSetting() {
-	var dbPassBytes []byte
-	fmt.Print("Enter Database Username : ")
-	readFromCLI(&dc.User)
-	fmt.Print("Enter Database Password : ")
-	dbPassBytes, errInput = term.ReadPassword(int(syscall.Stdin))
-	if errInput != nil {
-		fmt.Printf("Error at enter password: %v\n", errInput)
+	EnterText := map[*string]string{
+		&dc.User: ui.ENTER_DB_USERNAME,
+		&dc.Host: ui.ENTER_DB_HOSTNAME,
+		&dc.Port: ui.ENTER_DB_PORT,
+		&dc.Name: ui.ENTER_DB_NAME,
 	}
-	dc.Password = string(dbPassBytes)
-	fmt.Print("\nEnter Database Host name : ")
-	readFromCLI(&dc.Host)
-	fmt.Print("Enter Database Port Number : ")
-	readFromCLI(&dc.Port)
-	fmt.Print("Enter Database Name : ")
-	readFromCLI(&dc.Name)
+	for {
+		for field, prompt := range EnterText {
+			dc.readFromCLI(field, prompt)
+		}
+		if !dc.isHostAndNameValid() {
+			fmt.Println("Database Hostname or Database Name cannot contains \" \" in his title")
+			continue
+		}
+		if dc.isPortNumberValid() {
+			fmt.Println("The port number cannot be anything other than a number")
+			continue
+		}
+
+		fmt.Print(ui.ENTER_DB_PASSWORD)
+		dbPassBytes, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			fmt.Printf(ui.ERROR_ENTERING_PASSWORD, err)
+		}
+		if dc.isPasswordValid(dbPassBytes) {
+			fmt.Println("Password cannot be empty")
+			continue
+		}
+		dc.Password = string(dbPassBytes)
+
+		if dc.areRequiredFieldsFilled() {
+			fmt.Println("Manual Configuration is successfully")
+			break
+		}
+		fmt.Println(" Fields Database configuration cannot be empty\n Try again . . .\n ")
+	}
 }
 
-func readFromCLI(field *string) {
+func (dc *DatabaseConfiguration) readFromCLI(field *string, text string) {
 	reader := bufio.NewReader(os.Stdin)
-	*field, errInput = reader.ReadString('\n')
-	if errInput != nil {
-		fmt.Printf("An error occurred when entering data :%v \n", errInput)
+	var err error
+	for {
+		fmt.Print(text)
+		*field, err = reader.ReadString('\n')
+		if err != nil {
+			fmt.Printf(ui.ERROR_ENTERING_DATA, err)
+			continue
+		}
+		if *field != "" && strings.TrimSpace(*field) != "" {
+			*field = strings.TrimSpace(*field)
+			break
+		}
+		fmt.Println("This field cannot be empty")
 	}
-	*field = strings.TrimSpace(*field)
+}
+
+func (dc *DatabaseConfiguration) isHostAndNameValid() bool {
+	return !(strings.Contains(dc.Host, " ") || strings.Contains(dc.Name, " "))
+}
+func (dc *DatabaseConfiguration) isPortNumberValid() bool {
+	_, err := strconv.Atoi(dc.Port)
+	return err != nil
+}
+func (dc *DatabaseConfiguration) areRequiredFieldsFilled() bool {
+	return dc.User != "" && dc.Host != "" && dc.Port != "" && dc.Name != ""
+}
+
+func (dc *DatabaseConfiguration) isPasswordValid(pass []byte) bool {
+	if strings.TrimSpace(string(pass)) == "" {
+		return false
+	}
+	return true
 }
