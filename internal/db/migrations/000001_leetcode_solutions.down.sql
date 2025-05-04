@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS "task_category"
+DROP TABLE IF EXISTS "solution"
+DROP TABLE IF EXISTS "tasks"
+DROP TABLE IF EXISTS "language"
+DROP TABLE IF EXISTS "category"
+DROP TABLE IF EXISTS "level"
